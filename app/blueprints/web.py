@@ -28,7 +28,21 @@ IMAGE_FOLDER = BASE_DIR / "image"
 
 @web_bp.route("/", methods=["GET", "POST"])
 def login_page():
-    """Страница авторизации. GET — форма, POST — проверка."""
+    """Страница авторизации. GET — форма, POST — проверка.
+
+    Студенты: этот маршрут обрабатывает оба HTTP-метода:
+    - GET: возвращает HTML-форму для ввода логина и пароля.
+    - POST: получает данные формы, проверяет учётные данные, создаёт сессию.
+
+    Механизм блокировки аккаунта:
+    - При 3 неудачных попытках входа пользователь блокируется (is_blocked = True).
+    - Блокировка снимается только администратором.
+    - Это защита от brute-force атак (подбора пароля).
+
+    Почему session.clear() в logout?
+    - Удаляет все данные сессии, включая идентификатор пользователя.
+    - Гарантирует, что старый сессионный токен нельзя переиспользовать.
+    """
     if request.method == "POST":
         login_value = request.form.get("login", "").strip()
         password_value = request.form.get("password", "")
@@ -159,9 +173,24 @@ def specifications():
 @login_required
 def sales_orders():
     """Страница управления заказами покупателей."""
-    return render_template(
+    from flask import make_response
+    response = make_response(render_template(
         "sales-orders.html", user=current_user,
         current_page="sales-orders", page_title="Заказы покупателей"
+    ))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@web_bp.route("/production-orders")
+@login_required
+def production_orders():
+    """Страница управления заказами на производство."""
+    return render_template(
+        "production-orders.html", user=current_user,
+        current_page="production-orders", page_title="Заказы на производство"
     )
 
 

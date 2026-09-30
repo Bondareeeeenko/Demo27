@@ -1,4 +1,19 @@
-"""Blueprint для управления клиентами."""
+"""Blueprint для управления клиентами.
+
+Студенты: этот Blueprint демонстрирует RESTful API для ресурса "Клиенты".
+Каждый маршрут соответствует HTTP-методу и CRUD-операции:
+- GET /    -> list_clients  (получить список)
+- POST /   -> create_client (создать)
+- GET /<id>-> get_client    (получить один)
+- PUT  /<id>-> update_client (обновить)
+- DELETE /<id>-> delete_client (удалить)
+
+Статус-коды HTTP:
+- 200 OK — успешный GET/PUT
+- 201 Created — успешный POST (создание)
+- 400 Bad Request — ошибка валидации данных
+- 404 Not Found — ресурс не найден
+"""
 import uuid
 from flask import Blueprint, request, jsonify
 from app.models import Client
@@ -29,7 +44,13 @@ def list_clients():
 
 @clients_bp.route("/", methods=["POST"])
 def create_client():
-    """Создание клиента."""
+    """Создание клиента.
+
+    Студенты: обратите внимание на валидацию данных.
+    Мы проверяем, что поля name и client_type присутствуют в JSON.
+    Если нет — возвращаем 400 Bad Request с понятным сообщением об ошибке.
+    Это стандартная практика для API.
+    """
     data = request.get_json()
     if not data or "name" not in data or "client_type" not in data:
         return jsonify({
@@ -55,30 +76,14 @@ def create_client():
 
 @clients_bp.route("/<client_id>", methods=["GET"])
 def get_client(client_id):
-    """Получение клиента по ID."""
-    try:
-        client_uuid = uuid.UUID(client_id)
-    except (ValueError, AttributeError):
-        return jsonify({"error": "Bad Request", "message": "Неверный формат UUID"}), 400
+    """Получение клиента по ID.
 
-    client = db.session.get(Client, client_uuid)
-    if not client:
-        return jsonify({"error": "Not Found", "message": "Клиент не найден"}), 404
-
-    return jsonify({
-        "client_id": str(client.client_id),
-        "name": client.name,
-        "inn": client.inn,
-        "address": client.address,
-        "phone": client.phone,
-        "client_type": client.client_type,
-        "created_at": client.created_at.isoformat() if client.created_at else None,
-    }), 200
-
-
-@clients_bp.route("/<client_id>", methods=["PUT"])
-def update_client(client_id):
-    """Обновление клиента."""
+    Студенты: почему try/except для UUID?
+    - Flask передаёт client_id как строку из URL.
+    - Мы должны преобразовать его в UUID-объект Python.
+    - Если строка не является валидным UUID — ValueError.
+    - Мы ловим эту ошибку и возвращаем 400 вместо 500.
+    """
     try:
         client_uuid = uuid.UUID(client_id)
     except (ValueError, AttributeError):

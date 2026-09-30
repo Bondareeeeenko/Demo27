@@ -2,8 +2,9 @@
 import uuid
 from flask import request, Blueprint
 from app.views.base_view import BaseAPIView
-from app.models import SpecificationMaterial, SpecificationOperation
+from app.models import SpecificationMaterial, SpecificationOperation, MaterialPrice, OperationPrice
 from app.extensions import db
+from sqlalchemy import select
 
 specifications_bp = Blueprint("specifications", __name__)
 
@@ -12,15 +13,28 @@ class SpecificationMaterialListAPI(BaseAPIView):
     """Список и создание спецификаций материалов."""
 
     def get(self):
-        """Список спецификаций."""
+        """Список спецификаций материалов с наименованиями и ценами."""
         specs = db.session.execute(db.select(SpecificationMaterial)).scalars().all()
         specs_list = []
         for s in specs:
+            # Получаем текущую цену материала
+            price_stmt = select(MaterialPrice).where(
+                MaterialPrice.material_id == s.material_id
+            ).order_by(MaterialPrice.effective_date.desc()).limit(1)
+            price_record = db.session.execute(price_stmt).scalar_one_or_none()
+            material_price = float(price_record.price) if price_record else 0.0
+            
             specs_list.append({
                 "spec_mat_id": str(s.spec_mat_id),
                 "product_id": str(s.product_id),
+                "product_name": s.product.name if s.product else "",
+                "product_code": s.product.code if s.product else "",
                 "material_id": str(s.material_id),
+                "material_name": s.material.name if s.material else "",
+                "material_code": s.material.code if s.material else "",
                 "quantity_per_unit": float(s.quantity_per_unit),
+                "material_price": material_price,
+                "total_price": float(s.quantity_per_unit) * material_price
             })
         return self._success_response({"specifications": specs_list})
 
@@ -51,16 +65,29 @@ class SpecificationOperationListAPI(BaseAPIView):
     """Список и создание спецификаций операций."""
 
     def get(self):
-        """Список спецификаций."""
+        """Список спецификаций операций с наименованиями и ценами."""
         specs = db.session.execute(db.select(SpecificationOperation)).scalars().all()
         specs_list = []
         for s in specs:
+            # Получаем текущую цену операции
+            price_stmt = select(OperationPrice).where(
+                OperationPrice.operation_id == s.operation_id
+            ).order_by(OperationPrice.effective_date.desc()).limit(1)
+            price_record = db.session.execute(price_stmt).scalar_one_or_none()
+            operation_price = float(price_record.price) if price_record else 0.0
+            
             specs_list.append({
                 "spec_op_id": str(s.spec_op_id),
                 "product_id": str(s.product_id),
+                "product_name": s.product.name if s.product else "",
+                "product_code": s.product.code if s.product else "",
                 "operation_id": str(s.operation_id),
+                "operation_name": s.operation.name if s.operation else "",
+                "operation_code": s.operation.code if s.operation else "",
                 "time_norm": float(s.time_norm),
                 "op_quantity": float(s.op_quantity),
+                "operation_price": operation_price,
+                "total_price": float(s.time_norm) * float(s.op_quantity) * operation_price
             })
         return self._success_response({"specifications": specs_list})
 

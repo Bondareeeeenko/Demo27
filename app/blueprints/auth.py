@@ -1,4 +1,12 @@
-"""Blueprint для API авторизации."""
+"""Blueprint для API авторизации.
+
+Студенты: этот Blueprint предоставляет JSON API для авторизации.
+Отличие от web_bp (app/blueprints/web.py):
+- web_bp: возвращает HTML-страницы, использует redirect, render_template.
+- auth_bp: возвращает JSON, используется для AJAX/API запросов (например, с мобильного приложения).
+
+Оба маршрута используют одну и ту же логику проверки паролей (app/auth.py).
+"""
 from flask import Blueprint, request, jsonify
 from flask_login import login_user
 
@@ -11,7 +19,7 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    """Авторизация пользователя."""
+    """Авторизация пользователя через JSON API."""
     data = request.get_json()
     if not data or "login" not in data or "password" not in data:
         return jsonify({
@@ -58,7 +66,13 @@ def login():
 
 @auth_bp.route("/me", methods=["GET"])
 def get_current_user():
-    """Данные текущего пользователя."""
+    """Данные текущего пользователя.
+
+    Студенты: этот маршрут демонстрирует паттерн "profile endpoint".
+    После авторизации клиент может запросить /api/auth/me, чтобы получить
+    данные текущего пользователя (без пароля!). Это стандартная практика
+    для SPA (Single Page Application) и мобильных приложений.
+    """
     from flask_login import current_user
 
     if not current_user.is_authenticated:
@@ -74,7 +88,18 @@ def get_current_user():
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    """Регистрация нового пользователя."""
+    """Регистрация нового пользователя.
+
+    Студенты: обратите внимание на параметр role.
+    - По умолчанию устанавливается "Пользователь".
+    - В продакшене регистрация через API — потенциальная уязвимость!
+      Злоумышленник может зарегистрироваться с role="Администратор".
+      Для защиты нужно:
+      1. Отключить публичную регистрацию.
+      2. Или проверять, что пользователь имеет право создавать админов.
+      3. Или использовать отдельный админ-панель для создания пользователей.
+    """
+    data = request.get_json()
     data = request.get_json()
     if not data or "login" not in data or "password" not in data:
         return jsonify({

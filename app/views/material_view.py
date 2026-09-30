@@ -3,6 +3,9 @@ import uuid
 from flask import request, Blueprint
 from app.views.base_view import BaseAPIView
 from app.services.material_service import MaterialService
+from app.models import MaterialPrice
+from app.extensions import db
+from sqlalchemy import select
 
 materials_bp = Blueprint("materials", __name__)
 
@@ -14,9 +17,21 @@ class MaterialListAPI(BaseAPIView):
         self.service = MaterialService()
 
     def get(self):
-        """Список материалов."""
+        """Список материалов с текущей ценой."""
         materials = self.service.get_all_dto()
-        return self._success_response({"materials": [m.to_dict() for m in materials]})
+        result = []
+        for m in materials:
+            # Получаем текущую цену
+            price_stmt = select(MaterialPrice).where(
+                MaterialPrice.material_id == m.material_id
+            ).order_by(MaterialPrice.effective_date.desc()).limit(1)
+            price_record = db.session.execute(price_stmt).scalar_one_or_none()
+            current_price = float(price_record.price) if price_record else 0.0
+            
+            material_data = m.to_dict()
+            material_data["current_price"] = current_price
+            result.append(material_data)
+        return self._success_response({"materials": result})
 
     def post(self):
         """Создание материала."""
@@ -83,5 +98,44 @@ class MaterialDetailAPI(BaseAPIView):
         return self._success_response({"message": "Материал удалён"})
 
 
+class MaterialPriceAPI(BaseAPIView):
+    """Управление ценой материала."""
+
+    def put(self, material_id):
+        """Обновление цены."""
+        try:
+            material_uuid = uuid.UUID(material_id)
+        except (ValueError, AttributeError):
+            return self._error_response("Неверный формат UUID")
+
+        data = request.get_json()
+        if not data or "price" not in data:
+            return self._error_response("Укажите price")
+
+        from app.models import Material
+        material = db.session.get(Material, material_uuid)
+        if not material:
+            return self._not_found_response("Материал")
+
+        # Удаляем старые цены
+        old_prices = db.session.execute(
+            select(MaterialPrice).where(MaterialPrice.material_id == material_uuid)
+        ).scalars().all()
+        for old_price in old_prices:
+            db.session.delete(old_price)
+
+        # Создаём новую цену
+        new_price = MaterialPrice(
+            material_id=material_uuid,
+            price=data["price"]
+        )
+        db.session.add(new_price)
+        db.session.commit()
+
+        return self._success_response({"message": "Цена обновлена", "price": float(new_price.price)})
+
+
+
 materials_bp.add_url_rule("/", view_func=MaterialListAPI.as_view("materials_list"))
 materials_bp.add_url_rule("/<material_id>", view_func=MaterialDetailAPI.as_view("material_detail"))
+materials_bp.add_url_rule("/<material_id>/price", view_func=MaterialPriceAPI.as_view("material_price"))

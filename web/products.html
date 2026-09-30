@@ -10,7 +10,7 @@
             const tbody = document.getElementById('productsTableBody');
             
             if (!data.products || data.products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Продукции пока нет</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Продукции пока нет</td></tr>';
                 return;
             }
 
@@ -18,12 +18,13 @@
             data.products.forEach(product => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${product.product_id.substring(0, 8)}...</td>
                     <td>${product.name}</td>
                     <td>${product.code}</td>
+                    <td>${product.current_price ? product.current_price + ' ₽' : '—'}</td>
                     <td>${product.created_at ? new Date(product.created_at).toLocaleDateString('ru-RU') : '—'}</td>
                     <td>
                         <button class="btn btn-sm btn-outline" onclick='editProduct(${JSON.stringify(product)})'>✏️</button>
+                        <button class="btn btn-sm btn-warning" onclick="editProductPrice('${product.product_id}', ${product.current_price || 0})">💰</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteProduct('${product.product_id}')">🗑️</button>
                     </td>
                 `;
@@ -93,6 +94,35 @@
         }
     }
 
+    function editProductPrice(productId, currentPrice) {
+        document.getElementById('modalTitle').textContent = 'Изменить цену продукции';
+        document.getElementById('editPriceProductId').value = productId;
+        document.getElementById('productPriceInput').value = currentPrice || 0;
+        openModal('productPriceModal');
+    }
+
+    async function saveProductPrice(event) {
+        event.preventDefault();
+        const productId = document.getElementById('editPriceProductId').value;
+        const price = parseFloat(document.getElementById('productPriceInput').value);
+        
+        try {
+            const response = await fetch(`/api/products/${productId}/price`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ price: price })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Error');
+            showNotification('success', 'Успех', result.message || 'Цена обновлена');
+            closeModal('productPriceModal');
+            loadProducts();
+        } catch (error) {
+            showNotification('error', 'Ошибка', error.message);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', loadProducts);
 </script>
 <div class="data-table">
@@ -105,9 +135,9 @@
     <table>
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Название</th>
                 <th>Код</th>
+                <th>Цена</th>
                 <th>Дата создания</th>
                 <th>Действия</th>
             </tr>
@@ -138,6 +168,28 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('productModal')">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="productPriceModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle" class="modal-title">Изменить цену</h3>
+            <button class="modal-close" onclick="closeModal('productPriceModal')">&times;</button>
+        </div>
+        <form id="productPriceForm" onsubmit="saveProductPrice(event)">
+            <input type="hidden" id="editPriceProductId" value="">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Цена (₽) <span class="required">*</span></label>
+                    <input type="number" id="productPriceInput" class="form-input" step="0.01" min="0" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('productPriceModal')">Отмена</button>
                 <button type="submit" class="btn btn-primary">Сохранить</button>
             </div>
         </form>

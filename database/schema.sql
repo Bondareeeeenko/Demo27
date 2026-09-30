@@ -117,6 +117,8 @@ CREATE TABLE production_orders (
     order_number VARCHAR(50) UNIQUE NOT NULL,
     order_date DATE NOT NULL,
     subdivision VARCHAR(100),
+    client_id UUID REFERENCES clients(client_id),
+    total_amount DECIMAL(12,2) DEFAULT 0.00,
     status VARCHAR(20) NOT NULL DEFAULT 'Новый' CHECK (status IN ('Новый', 'В работе', 'Завершён', 'Отменён')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -128,7 +130,10 @@ CREATE TABLE production_order_items (
     order_item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     production_order_id UUID NOT NULL REFERENCES production_orders(order_id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE RESTRICT,
-    quantity DECIMAL(10,2) NOT NULL CHECK (quantity > 0)
+    quantity DECIMAL(10,2) NOT NULL CHECK (quantity > 0),
+    completed_quantity DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (completed_quantity >= 0),
+    unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price >= 0),
+    total_price DECIMAL(12,2) NOT NULL CHECK (total_price >= 0)
 );
 
 -- ============================================================
